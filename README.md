@@ -1,55 +1,85 @@
 # Laboratorio de Ciberseguridad con VirtualBox
 
+**Estudiante:** Natalia Alvarez  
+**Módulo:** 2 — Protegiendo el sistema operativo (Windows/Linux)
+
 ## 1. Objetivo
 
-El objetivo de este laboratorio es preparar un entorno virtual de pruebas utilizando Oracle VirtualBox y Ubuntu. La práctica busca aplicar los conceptos de virtualización, aislamiento y seguridad, evitando exponer innecesariamente el equipo anfitrión y la red doméstica.
+Preparar y documentar un entorno de prácticas usando Oracle VirtualBox y aplicar medidas básicas de hardening en Windows y fundamentos de permisos y gestión de paquetes en Ubuntu. El objetivo es practicar aislamiento, mínimo privilegio, actualizaciones y recuperación mediante instantáneas.
 
 ## 2. Entorno utilizado
 
+### Ubuntu
 - **Hipervisor:** Oracle VirtualBox 7.2.20.
-- **Sistema operativo invitado:** Ubuntu Desktop 22.04.5 LTS (64 bits).
-- **Máquina virtual:** Ubuntu-Lab-Ciberseguridad.
-- **Memoria RAM asignada:** 4096 MB (4 GB).
-- **Procesadores virtuales:** 2.
-- **Disco virtual:** 35 GB, formato VDI y asignación dinámica.
-- **Red:** Red Interna (Internal Network).
-- **Nombre de la red:** `intnet`.
+- **Sistema invitado:** Ubuntu Desktop 22.04.5 LTS (64 bits).
+- **VM:** `Ubuntu-Lab-Ciberseguridad`.
+- **Recursos:** 4096 MB de RAM, 2 CPU virtuales, disco VDI dinámico de 35 GB.
+- **Red para la práctica:** Red Interna (`intnet`). Se cambió temporalmente a NAT para ejecutar `sudo apt update` y luego se restauró Red Interna.
 
-## 3. Configuración de red y justificación técnica
+### Windows
+- **Sistema invitado:** Windows 11 Enterprise Evaluation (64 bits).
+- **VM:** `Windows-Lab-Ciberseguridad`.
+- **Recursos:** 4096 MB de RAM, 2 CPU virtuales, disco VDI dinámico de 64 GB.
+- **Red:** NAT para permitir la conectividad saliente requerida por Windows Update.
 
-Se seleccionó el modo **Red Interna (Internal Network)** porque el objetivo inicial es disponer de un entorno de práctica aislado que no necesita acceso a Internet ni comunicación directa con el sistema anfitrión.
+## 3. Configuración y aislamiento de red
 
-Este modo permite la comunicación entre máquinas virtuales conectadas a la misma red interna, sin proporcionar conectividad directa con el equipo anfitrión ni con Internet.
+Ubuntu quedó configurada en **Red Interna (`intnet`)**. Este modo permite comunicación entre las VMs conectadas a la misma red interna, pero no da acceso directo a Internet ni conecta directamente a la VM con el host. Se utilizó NAT de forma temporal para actualizar el índice de paquetes y luego se restituyó la red interna.
 
-No se seleccionó el modo **Adaptador Puente (Bridged)** porque conecta la máquina virtual directamente a la red local como si fuera otro dispositivo físico. Esto podría aumentar la exposición de la máquina virtual frente a otros equipos de la red doméstica.
+No se eligió modo Puente porque conectaría la VM a la red local como un dispositivo más, aumentando su exposición. NAT permite conectividad saliente útil para actualizaciones sin poner a la VM directamente en la red doméstica; no debe confundirse con aislamiento absoluto.
 
-El aislamiento reduce la superficie de exposición, aunque no garantiza una protección absoluta. Por ello, se mantienen deshabilitados el portapapeles compartido, la función de arrastrar y soltar y las carpetas compartidas que no sean necesarias.
+![Configuración de red de Ubuntu](configuracion-red.png)
 
-### Evidencia de la configuración de red
+## 4. Instantánea de la instalación base
 
-![Configuración de red de VirtualBox](configuracion-red.png)
+Se creó la instantánea **`Instalación Base Limpia`** con Ubuntu apagado. Este punto de restauración permite recuperar el estado base si una práctica posterior produce cambios inesperados.
 
-## 4. Instantánea de recuperación
+![Instantánea base de Ubuntu](snapshot-instalacion-base.png)
 
-Se creó una instantánea con el nombre **Instalación Base Limpia** para conservar un punto de restauración de la máquina virtual antes de realizar prácticas posteriores.
+## 5. Windows: hardening básico
 
-Las instantáneas permiten volver a un estado anterior de la máquina virtual si una prueba provoca cambios no deseados. No sustituyen a las copias de seguridad independientes.
+### 5.1 Principio de menor privilegio
 
-### Evidencia de la instantánea
+Se mantuvo una cuenta administrativa separada (`AdminLab`) y se creó `UsuarioSeguro`, que aparece en el grupo `Usuarios` y no en `Administradores`. Para tareas habituales se recomienda utilizar la cuenta estándar y reservar la elevación administrativa para tareas que realmente la necesiten.
 
-![Instantánea Instalación Base Limpia](snapshot-instalacion-base.png)
+![Cuentas de Windows](usuarios-windows.png)
 
-## 5. Buenas prácticas aplicadas
+### 5.2 Windows Update
 
-- Asignar recursos virtuales moderados para conservar recursos del equipo anfitrión.
-- Utilizar una red interna para las prácticas que no requieren conectividad externa.
-- Evitar el intercambio innecesario de archivos entre el anfitrión y la máquina invitada.
-- Crear una instantánea antes de realizar cambios o pruebas importantes.
-- Descargar el software desde fuentes oficiales.
-- Mantener el sistema actualizado cuando se habilite una conexión de red apropiada y controlada.
+Windows Update mostró **«¡Todo está actualizado!»** después de completar las actualizaciones detectadas.
 
-## 6. Conclusión
+![Windows Update actualizado](windows-update.png)
 
-Se preparó un laboratorio virtual con Ubuntu para realizar futuras prácticas de ciberseguridad. La configuración prioriza el aislamiento de red, la reducción de canales de intercambio con el equipo anfitrión y la posibilidad de recuperar un estado conocido mediante instantáneas.
+### 5.3 Desactivación de SMB 1.0/CIFS
 
-Este entorno constituye una base de aprendizaje. Antes de ejecutar herramientas o analizar archivos sospechosos, será necesario evaluar los riesgos de cada actividad y mantener las medidas de aislamiento adecuadas.
+En las características de Windows se verificó que SMB 1.0/CIFS y los subcomponentes Cliente, Eliminación automática y Servidor están desmarcados. Si el protocolo heredado no es necesario, mantenerlo deshabilitado reduce funcionalidades innecesarias y la superficie de ataque.
+
+![SMB 1.0/CIFS desactivado](smb-1.0-desactivado.png)
+
+## 6. Linux: permisos de archivo y gestión de paquetes
+
+Se creó `~/archivo-laboratorio.txt` y se consultaron sus permisos mediante `ls -l`. El resultado observado fue:
+
+```text
+-rw-rw-r-- 1 nati nati 0 oct 15 12:41 /home/nati/archivo-laboratorio.txt
+```
+
+El archivo tiene lectura y escritura para el propietario y su grupo, y lectura para otros usuarios; no tiene permiso de ejecución.
+
+![Permisos del archivo en Ubuntu](permisos-archivo.png)
+
+Se ejecutó `sudo apt update` con Ubuntu temporalmente en NAT. El proceso finalizó leyendo las listas de paquetes y actualizando el índice local; informó que había 446 paquetes actualizables. `apt update` refresca la información disponible de los repositorios, pero no instala esas actualizaciones por sí mismo.
+
+![Ejecución de apt update](apt-update-en-ejecucion.png)
+
+![Resultado final de apt update](apt-update-finalizado.png)
+
+## 7. Instantánea de hardening
+
+Como evidencia complementaria del checkpoint, se creó en Windows la instantánea **`Clean Install - Hardening applied`** con la VM apagada. La instantánea conserva el estado de esa máquina en el momento de su creación, pero no sustituye una copia de seguridad independiente.
+
+![Instantánea de Windows](snapshot-windows-hardening.png)
+
+## 8. Conclusión
+
+El laboratorio combina aislamiento de red, cuentas separadas por privilegios, actualizaciones y desactivación de un protocolo heredado que no se necesita. Las instantáneas aportan puntos de recuperación antes de prácticas posteriores. La virtualización reduce el riesgo para el equipo anfitrión, pero no es una garantía absoluta: conviene limitar integraciones con el host, elegir cuidadosamente la red y practicar solo en entornos controlados.
